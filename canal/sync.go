@@ -5,11 +5,11 @@ import (
     "regexp"
     "time"
 
-    "github.com/juju/errors"
-    "github.com/satori/go.uuid"
     "github.com/daiguadaidai/go-mysql-migration/mysql"
     "github.com/daiguadaidai/go-mysql-migration/replication"
     "github.com/daiguadaidai/go-mysql-migration/schema"
+    "github.com/juju/errors"
+    "github.com/satori/go.uuid"
     log "github.com/sirupsen/logrus"
 )
 

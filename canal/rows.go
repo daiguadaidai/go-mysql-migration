@@ -3,8 +3,8 @@ package canal
 import (
     "fmt"
 
-    "github.com/juju/errors"
     "github.com/daiguadaidai/go-mysql-migration/schema"
+    "github.com/juju/errors"
 )
 
 const (
@@ -66,4 +66,15 @@ func GetColumnValue(table *schema.Table, column string, row []interface{}) (inte
 // String implements fmt.Stringer interface.
 func (r *RowsEvent) String() string {
     return fmt.Sprintf("%s %s %v", r.Action, r.Table, r.Rows)
+}
+
+// 比较update 主键值是否一致
+func (r *RowsEvent) IsPKValueCons(oldRow []interface{}, newRow []interface{}) bool {
+    for _, pkIdx := range r.Table.PKColumns {
+        if oldRow[pkIdx] != newRow[pkIdx] {
+            return false
+        }
+    }
+
+    return true
 }

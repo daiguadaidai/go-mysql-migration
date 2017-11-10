@@ -39,7 +39,8 @@ func main() {
         log.Error(err)
     }
     eventHandler := new(canal.OTOEventHandler)
+    eventHandler.InsBatchSize = 2
     channel.SetEventHandler(eventHandler)
 
-    channel.StartFrom(mysql.Position{"mysql-bin.000010", 0})
+    channel.StartFrom(mysql.Position{"mysql-bin.000012", 0})
 }

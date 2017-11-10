@@ -54,9 +54,13 @@ type Table struct {
     Indexes   []*Index
     PKColumns []int
 
-    insertSQLTemplate string
-    updateSQLTemplate string
-    deleteSQLTemplate string
+    colNum         int    // 表列个数
+    oldColNum      int    // 上一次表列个数
+    insSQLTitTpl   string // Insert SQL Title 模板 REPLACE INTO %s(id, name) VALUES
+    insSQLValTpl   string // Insert SQL Value 模板 (%s, %s)
+    updSQLSetTpl   string // Update SQL 模板 UPDATE %s SET=%s
+    updSQLWhereTpl string // Update SQL 模板 WHERE pri=%s
+    delSQLTpl      string // Delete SQL 模板 DELETE FROM %s WHERE pri=%s
 }
 
 func (ta *Table) String() string {
@@ -137,15 +141,21 @@ func (ta *Table) AddIndex(name string) (index *Index) {
 }
 
 // 获得表的 insert sql 语句模板
-func (ta *Table) GetInsertSqlTemplate() string {
-    if len(ta.insertSQLTemplate) == 0 { // 如果没有定义insert的模板则从新生成一个
+// 返回: insSQLTitTpl: Insert SQL Title 模板
+//       insSQLValTpl: Insert SQL Value 模板
+func (ta *Table) GetInsertSqlTemplate() (string, string) {
+
+    if len(ta.insSQLTitTpl) == 0 || len(ta.insSQLValTpl) == 0 { // 如果没有定义insert的模板则从新生成一个
         columnNames := ""  // 字段名
         columnValues := "" // 字段值
         for _, column := range ta.Columns {
             columnNames += column.Name + ", "
-            if column.Type == TYPE_NUMBER || column.Type == TYPE_FLOAT { // 类型是数字
-                columnValues += `%s, `
-            } else { // 类型是字符串
+            switch column.Type {
+            case TYPE_NUMBER: // 数值型
+                columnValues += `%d, `
+            case TYPE_FLOAT: // double, float 浮点类型
+                columnValues += `%f, `
+            default: // 其他类型
                 columnValues += `'%s', `
             }
         }
@@ -154,26 +164,81 @@ func (ta *Table) GetInsertSqlTemplate() string {
         columnNames = columnNames[:len(columnNames)-2]
         columnValues = columnValues[:len(columnValues)-2]
 
-        // 拼接出改表的insert模板
-        insertSQLTemplate := fmt.Sprintf(
-            `/* canal %s -> %s */ INSERT INTO %s(%s) VALUES(%s)`,
+        // 拼接出改表的insert SQL Title 模板
+        insSQLTitTpl := fmt.Sprintf(
+            `/* canal %s -> %s */ REPLACE INTO %s(%s) VALUES`,
             `%s.%s`,
             `%s.%s`,
             `%s`,
-            columnNames,
-            columnValues)
+            columnNames)
+        // 拼接出Insert SQL Value 模板
+        insSQLValTpl := fmt.Sprintf(`(%s)`, columnValues)
 
-        ta.insertSQLTemplate = insertSQLTemplate
+        ta.insSQLTitTpl = insSQLTitTpl
+        ta.insSQLValTpl = insSQLValTpl
     }
 
-    return ta.insertSQLTemplate
+    return ta.insSQLTitTpl, ta.insSQLValTpl
 }
 
 // 获得表的 update sql 语句模板
-func (ta *Table) GetUpdateSqlTemplate() string { return "" }
+// 返回: updSQLSetTpl: Update SQL Set 块 模板
+//       updSQLWhereTpl: Update SQL Where 块 模板
+func (ta *Table) GetUpdateSqlTemplate() (string, string) {
+    if len(ta.updSQLSetTpl) == 0 || len(ta.updSQLWhereTpl) == 0 { // 如果没有定义update的模板则从新生成一个
+
+        // 拼接Set模板
+        updSQLSetTpl := `/* canal %s.%s -> %s.%s */UPDATE %s ` // 初始化 set 子句
+        for _, column := range ta.Columns {
+            switch column.Type {
+            case TYPE_NUMBER: // 数值型
+                updSQLSetTpl += column.Name + `=%d, `
+            case TYPE_FLOAT: // double, float 浮点类型
+                updSQLSetTpl += column.Name + `=%f, `
+            default: // 其他类型
+                updSQLSetTpl += column.Name + `='%s', `
+            }
+        }
+
+        updSQLSetTpl = updSQLSetTpl[:len(updSQLSetTpl)-2] // 除去最后一个逗号(,)
+        updSQLSetTpl += " "                               // 在最后添加一个空格
+
+        // 拼凑 WHERE 模板
+        updSQLWhereTpl := `WHERE ` // 初始化WHERE子句模板
+        // 获得主键列
+        for _, pkColIdx := range ta.PKColumns {
+            column := ta.GetPKColumn(pkColIdx)
+            switch column.Type {
+            case TYPE_NUMBER: // 数值型
+                updSQLWhereTpl += column.Name + `=%d, `
+            case TYPE_FLOAT: // double, float 浮点类型
+                updSQLWhereTpl += column.Name + `=%f, `
+            default: // 其他类型
+                updSQLWhereTpl += column.Name + `='%s', `
+            }
+        }
+        updSQLWhereTpl = updSQLWhereTpl[:len(updSQLWhereTpl)-2] // 除去最后一个逗号(,)
+
+        ta.updSQLSetTpl = updSQLSetTpl
+        ta.updSQLWhereTpl = ta.updSQLWhereTpl
+
+    }
+
+    return ta.updSQLSetTpl, ta.updSQLWhereTpl
+}
 
 // 获得表的 delete sql 语句模板
 func (ta *Table) GetDeleteSqlTemplate() string { return "" }
+
+// 获得表列数
+// 返回: 表的列个数
+func (ta *Table) GetTableColNum() int {
+    if ta.colNum == 0 {
+        ta.colNum = len(ta.Columns)
+    }
+
+    return ta.colNum
+}
 
 func NewIndex(name string) *Index {
     return &Index{name, make([]string, 0, 8), make([]uint64, 0, 8)}

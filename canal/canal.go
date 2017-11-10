@@ -7,11 +7,11 @@ import (
     "strings"
     "sync"
 
-    "github.com/juju/errors"
     "github.com/daiguadaidai/go-mysql-migration/client"
     "github.com/daiguadaidai/go-mysql-migration/mysql"
     "github.com/daiguadaidai/go-mysql-migration/replication"
     "github.com/daiguadaidai/go-mysql-migration/schema"
+    "github.com/juju/errors"
     log "github.com/sirupsen/logrus"
 )
 
